@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { IUser } from "@/types";
 import { getCurrentUser } from "@/lib/appwrite/api";
 
-export const INITIAL_USER = {
+export const INITIAL_USER: IUser = {
   id: "",
   name: "",
   username: "",
@@ -13,33 +13,33 @@ export const INITIAL_USER = {
   bio: "",
 };
 
-const INITIAL_STATE = {
+interface IAuthContext {
+  user: IUser;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  setUser: React.Dispatch<React.SetStateAction<IUser>>;
+  setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>;
+  checkAuthUser: () => Promise<boolean>;
+}
+
+const INITIAL_STATE: IAuthContext = {
   user: INITIAL_USER,
   isLoading: false,
   isAuthenticated: false,
   setUser: () => {},
   setIsAuthenticated: () => {},
-  checkAuthUser: async () => false as boolean,
+  checkAuthUser: async () => false,
 };
 
-type IContextType = {
-  user: IUser;
-  isLoading: boolean;
-  setUser: React.Dispatch<React.SetStateAction<IUser>>;
-  isAuthenticated: boolean;
-  setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>;
-  checkAuthUser: () => Promise<boolean>;
-};
+const AuthContext = createContext<IAuthContext>(INITIAL_STATE);
 
-const AuthContext = createContext<IContextType>(INITIAL_STATE);
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState<IUser>(INITIAL_USER);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const checkAuthUser = async () => {
+  const checkAuthUser = async (): Promise<boolean> => {
     setIsLoading(true);
     try {
       const currentAccount = await getCurrentUser();
@@ -53,13 +53,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           bio: currentAccount.bio,
         });
         setIsAuthenticated(true);
-
         return true;
       }
-
       return false;
     } catch (error) {
-      console.error(error);
+      console.error("Failed to fetch current user:", error);
       return false;
     } finally {
       setIsLoading(false);
@@ -68,16 +66,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const cookieFallback = localStorage.getItem("cookieFallback");
-    if (
-      cookieFallback === "[]" ||
-      cookieFallback === null ||
-      cookieFallback === undefined
-    ) {
+    if (!cookieFallback || cookieFallback === "[]") {
       navigate("/sign-in");
+    } else {
+      checkAuthUser();
     }
-
-    checkAuthUser();
-  }, []);
+  }, [navigate]);
 
   const value = {
     user,
@@ -89,6 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+};
 
-export const useUserContext = () => useContext(AuthContext);
+export const useAuthContext = (): IAuthContext => useContext(AuthContext);
